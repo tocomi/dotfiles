@@ -1,0 +1,17 @@
+[user]
+	name = tocomi
+	email = tocomi0112@gmail.com
+[push]
+	default = current
+[alias]
+	co = checkout
+	fe = fetch
+	st = status
+	me = merge
+	cm = commit
+	pu = push origin HEAD
+	br = branch
+	di = diff
+	lo = log --oneline
+[core]
+	editor = vim
