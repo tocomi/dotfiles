@@ -18,5 +18,6 @@ alias gd='git diff'
 alias gf='git fetch '
 alias glo='git log --oneline'
 alias gm='git merge'
+alias gp='git push origin HEAD'
 alias gs='git status'
 
