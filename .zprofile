@@ -9,3 +9,14 @@ alias la='ls -al'
 
 alias c='clear'
 
+# git
+alias ga='git add -A'
+alias gc='git checkout'
+alias gcb='git checkout -b'
+alias gcm='git commit -m'
+alias gd='git diff'
+alias gf='git fetch '
+alias glo='git log --oneline'
+alias gm='git merge'
+alias gs='git status'
+
