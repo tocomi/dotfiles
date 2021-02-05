@@ -11,6 +11,7 @@ alias c='clear'
 
 # git
 alias ga='git add -A'
+alias gb='git branch'
 alias gc='git checkout'
 alias gcb='git checkout -b'
 alias gcm='git commit -m'
