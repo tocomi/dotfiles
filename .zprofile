@@ -1,7 +1,8 @@
 # alias
-alias ezsh='vim ~/.zprofile'
-alias ezshrc='vim ~/.zshrc'
-alias szsh='source ~/.zprofile && source ~/.zshrc'
+alias cdz="cd ~/dotifiles"
+alias ez='vim ~/.zprofile'
+alias ezrc='vim ~/.zshrc'
+alias sz='source ~/.zprofile && source ~/.zshrc'
 
 alias ll='ls -l'
 alias la='ls -al'
