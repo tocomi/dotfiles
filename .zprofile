@@ -20,7 +20,7 @@ alias gd='git diff'
 alias gf='git fetch --prune'
 alias glo='git log --oneline'
 alias gm='git merge'
-alias gmm='gf && git merge origin/main'
+alias gmm='gf && gc main && gm && gc - && gm main'
 alias gp='git push origin HEAD'
 alias gs='git status'
 
