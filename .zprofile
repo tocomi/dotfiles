@@ -27,3 +27,6 @@ alias gs='git status'
 # docker
 alias dcud='docker compose up -d'
 
+# agent
+alias ccv='PORT=3400 npx @kimuson/claude-code-viewer@latest'
+
