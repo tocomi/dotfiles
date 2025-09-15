@@ -24,3 +24,6 @@ alias gmm='gf && gc main && gm && gc - && gm main'
 alias gp='git push origin HEAD'
 alias gs='git status'
 
+# docker
+alias dcud='docker compose up -d'
+
