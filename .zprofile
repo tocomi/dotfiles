@@ -1,7 +1,8 @@
 # alias
-alias ezsh='vim ~/.zprofile'
-alias ezshrc='vim ~/.zshrc'
-alias szsh='source ~/.zprofile && source ~/.zshrc'
+alias cdz="cd ~/dotifiles"
+alias ez='vim ~/.zprofile'
+alias ezrc='vim ~/.zshrc'
+alias sz='source ~/.zprofile && source ~/.zshrc'
 
 alias ll='ls -l'
 alias la='ls -al'
@@ -19,7 +20,13 @@ alias gd='git diff'
 alias gf='git fetch --prune'
 alias glo='git log --oneline'
 alias gm='git merge'
-alias gmm='gf && gc main && gm && gc - && git merge main'
+alias gmm='gf && gc main && gm && gc - && gm main'
 alias gp='git push origin HEAD'
 alias gs='git status'
+
+# docker
+alias dcud='docker compose up -d'
+
+# agent
+alias ccv='PORT=3400 npx @kimuson/claude-code-viewer@latest'
 
