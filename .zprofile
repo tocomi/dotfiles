@@ -28,5 +28,5 @@ alias gs='git status'
 alias dcud='docker compose up -d'
 
 # agent
-alias ccv='PORT=3400 npx @kimuson/claude-code-viewer@latest'
+alias cc='claude --dangerously-skip-permissions'
 
