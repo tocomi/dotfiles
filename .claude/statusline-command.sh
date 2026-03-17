@@ -15,6 +15,7 @@ GREEN=$'\033[32m'
 CYAN=$'\033[36m'
 YELLOW=$'\033[33m'
 MAGENTA=$'\033[35m'
+RED=$'\033[31m'
 DIM=$'\033[2m'
 RESET=$'\033[0m'
 
@@ -188,11 +189,13 @@ except Exception:
     pass
 
 if added or removed:
-    print(f"+{added}/-{removed}")
+    print(f"+{added}|{removed}")
 PYEOF
   )
   if [ -n "$changed_lines" ]; then
-    lines_str="${DIM} | ${RESET}${GREEN}✏️ ${changed_lines}${RESET}"
+    added_part="${changed_lines%%|*}"
+    removed_part="${changed_lines##*|}"
+    lines_str="${DIM} | ${RESET}${GREEN}✏️ ${added_part}${RESET}/${RED}-${removed_part}${RESET}"
   fi
 fi
 
