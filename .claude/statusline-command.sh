@@ -7,6 +7,7 @@ model_id=$(echo "$input" | jq -r '.model.id // empty')
 used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 total_input=$(echo "$input" | jq -r '.context_window.total_input_tokens // empty')
 total_output=$(echo "$input" | jq -r '.context_window.total_output_tokens // empty')
+transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
 
 # ANSI color codes (ANSI-C quoting so escapes are interpreted in all contexts)
 BLUE=$'\033[34m'
@@ -64,7 +65,56 @@ if [ -n "$total_input" ] && [ "$total_input" != "null" ] && \
   cost_str="${DIM} | ${RESET}${MAGENTA}💸 \$${cost}${RESET}"
 fi
 
-# Line 1: directory and git branch
-printf "%s%s\n" "${BLUE}📁 ${dir}${RESET}" "$branch_str"
+# Changed lines from transcript (sum of line diffs in edit tool calls)
+lines_str=""
+if [ -n "$transcript_path" ] && [ -f "$transcript_path" ]; then
+  changed_lines=$(python3 - "$transcript_path" <<'PYEOF'
+import sys, json
+
+path = sys.argv[1]
+added = 0
+removed = 0
+
+try:
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            # Look for assistant tool_use messages with edit-like tools
+            if obj.get("type") != "assistant":
+                continue
+            msg = obj.get("message", {})
+            for block in msg.get("content", []):
+                if block.get("type") != "tool_use":
+                    continue
+                tool = block.get("name", "")
+                inp = block.get("input", {})
+                if tool in ("Edit", "str_replace_editor", "str_replace_based_editor_tool"):
+                    old = inp.get("old_string", inp.get("old_str", ""))
+                    new = inp.get("new_string", inp.get("new_str", ""))
+                    removed += len(old.splitlines()) if old else 0
+                    added   += len(new.splitlines()) if new else 0
+                elif tool == "Write":
+                    content = inp.get("content", "")
+                    added += len(content.splitlines()) if content else 0
+except Exception:
+    pass
+
+if added or removed:
+    print(f"+{added}/-{removed}")
+PYEOF
+  )
+  if [ -n "$changed_lines" ]; then
+    lines_str="${DIM} | ${RESET}${GREEN}✏️ ${changed_lines}${RESET}"
+  fi
+fi
+
+# Line 1: directory, git branch, and changed lines
+printf "%s%s%s\n" "${BLUE}📁 ${dir}${RESET}" "$branch_str" "$lines_str"
 # Line 2: model, context usage, estimated cost
 printf "%s%s%s\n" "$model_str" "$ctx_str" "$cost_str"
