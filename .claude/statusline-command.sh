@@ -48,6 +48,88 @@ else
   model_str=""
 fi
 
+# Rate limit usage (5h and 7d windows) - cached 60s
+USAGE_CACHE="/tmp/claude-usage-cache.json"
+USAGE_TTL=60
+
+get_usage_data() {
+  if [ -f "$USAGE_CACHE" ]; then
+    cache_age=$(( $(date +%s) - $(stat -f %m "$USAGE_CACHE" 2>/dev/null || echo 0) ))
+    if [ "$cache_age" -lt "$USAGE_TTL" ]; then
+      cat "$USAGE_CACHE"
+      return
+    fi
+  fi
+
+  # Get OAuth token from macOS Keychain
+  token=""
+  if command -v security >/dev/null 2>&1; then
+    creds=$(security find-generic-password -s "Claude Code-credentials" -a "$(whoami)" -w 2>/dev/null) || true
+    [ -n "$creds" ] && token=$(echo "$creds" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+  fi
+  # Fallback: credentials file
+  if [ -z "$token" ]; then
+    for cred_file in "$HOME/.claude/.credentials.json" "$HOME/.config/claude/credentials.json"; do
+      if [ -f "$cred_file" ]; then
+        token=$(jq -r '.claudeAiOauth.accessToken // empty' "$cred_file" 2>/dev/null)
+        [ -n "$token" ] && break
+      fi
+    done
+  fi
+
+  [ -z "$token" ] && return
+
+  result=$(curl -sf --max-time 5 \
+    -H "Authorization: Bearer $token" \
+    -H "anthropic-beta: oauth-2025-04-20" \
+    "https://api.anthropic.com/api/oauth/usage" 2>/dev/null)
+
+  if [ -n "$result" ]; then
+    echo "$result" > "$USAGE_CACHE"
+    echo "$result"
+  fi
+}
+
+# Format ISO 8601 (UTC) reset time -> JST "HH:MM" (same day) or "MM/DD HH:MM" (other day)
+format_reset() {
+  local t="$1"
+  [ -z "$t" ] && return
+  # Strip microseconds and timezone offset -> bare "YYYY-MM-DDTHH:MM:SS"
+  local t_clean
+  t_clean=$(echo "$t" | sed 's/\.[0-9]*//' | sed 's/[+-][0-9][0-9]:[0-9][0-9]$//' | sed 's/Z$//')
+  # Parse as UTC (+0000), output in JST (UTC+9)
+  local jst
+  jst=$(TZ="Asia/Tokyo" date -jf "%Y-%m-%dT%H:%M:%S%z" "${t_clean}+0000" "+%m/%d %H:%M" 2>/dev/null \
+     || TZ="Asia/Tokyo" date -d "${t_clean}Z" "+%m/%d %H:%M" 2>/dev/null) || { echo "$t"; return; }
+  # Today in JST
+  local today
+  today=$(TZ="Asia/Tokyo" date "+%m/%d")
+  local reset_day="${jst%% *}"
+  if [ "$reset_day" = "$today" ]; then
+    echo "${jst##* }"   # 時刻のみ
+  else
+    echo "$jst"          # MM/DD HH:MM
+  fi
+}
+
+rate_str=""
+usage_data=$(get_usage_data 2>/dev/null)
+if [ -n "$usage_data" ]; then
+  five_util=$(echo "$usage_data" | jq -r '.five_hour.utilization // empty')
+  five_reset=$(echo "$usage_data" | jq -r '.five_hour.resets_at // empty')
+  seven_util=$(echo "$usage_data" | jq -r '.seven_day.utilization // empty')
+  seven_reset=$(echo "$usage_data" | jq -r '.seven_day.resets_at // empty')
+
+  if [ -n "$five_util" ] && [ "$five_util" != "null" ] && \
+     [ -n "$seven_util" ] && [ "$seven_util" != "null" ]; then
+    five_pct=$(printf "%.0f" "$five_util")
+    seven_pct=$(printf "%.0f" "$seven_util")
+    five_reset_fmt=$(format_reset "$five_reset")
+    seven_reset_fmt=$(format_reset "$seven_reset")
+    rate_str="${CYAN}🕐 ${five_pct}%(↺${five_reset_fmt})${RESET}${DIM} | ${RESET}${CYAN}🗓️ ${seven_pct}%(↺${seven_reset_fmt})${RESET}"
+  fi
+fi
+
 # Estimated cost from total session tokens
 # Pricing per 1M tokens (approximate, based on model ID):
 #   claude-opus*:   input $15, output $75
@@ -118,3 +200,7 @@ fi
 printf "%s%s%s\n" "${BLUE}📁 ${dir}${RESET}" "$branch_str" "$lines_str"
 # Line 2: model, context usage, estimated cost
 printf "%s%s%s\n" "$model_str" "$ctx_str" "$cost_str"
+# Line 3: rate limits (5h and 7d)
+if [ -n "$rate_str" ]; then
+  printf "%s\n" "$rate_str"
+fi
