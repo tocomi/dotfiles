@@ -1,5 +1,5 @@
 # alias
-alias cdz="cd ~/dotifiles"
+alias cdz="cd ~/dotfiles"
 alias ez='vim ~/.zsh_common'
 alias ezrc='vim ~/.zshrc'
 alias sz='exec zsh'
@@ -50,6 +50,11 @@ bindkey '^[[B' down-line-or-beginning-search
 bindkey '^P' up-line-or-beginning-search
 bindkey '^N' down-line-or-beginning-search
 
+# completion
+# zsh-autosuggestions の completion strategy より前に初期化する必要がある
+autoload -Uz compinit
+compinit
+
 # zsh-autosuggestions
 for _zsh_autosuggest in \
   /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
@@ -57,7 +62,8 @@ for _zsh_autosuggest in \
 do
   if [ -f "$_zsh_autosuggest" ]; then
     source "$_zsh_autosuggest"
-    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
+    # fg=8 (#666666) は背景 #282c34 とのコントラストが 2.4:1 しかなく読めないため 246 (#949494)
+    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=246'
     ZSH_AUTOSUGGEST_STRATEGY=(history completion)
     bindkey '^ ' autosuggest-accept
     break
