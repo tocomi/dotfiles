@@ -1,0 +1,67 @@
+# alias
+alias cdz="cd ~/dotifiles"
+alias ez='vim ~/.zsh_common'
+alias ezrc='vim ~/.zshrc'
+alias sz='exec zsh'
+
+alias ll='ls -l'
+alias la='ls -al'
+
+alias c='clear'
+
+# git
+alias ga='git add -A'
+alias gb='git branch'
+alias gc='git checkout'
+alias gcb='git checkout -b'
+alias gcm='git commit -m'
+alias gce="git commit --allow-empty -m 'initial commit'"
+alias gd='git diff'
+alias gf='git fetch --prune'
+alias glo='git log --oneline'
+alias gm='git merge'
+alias gmm='gf && gc main && gm && gc - && gm main'
+alias gmd='gf && gc develop && gm && gc - && gm develop'
+alias gp='git push origin HEAD'
+alias gs='git status'
+
+# docker
+alias dcud='docker compose up -d'
+
+# agent
+alias cc='claude --permission-mode auto'
+
+# history
+# HISTSIZE/SAVEHIST は /etc/zshrc が上書きするため .zshrc 経由で読む
+HISTFILE=~/.zsh_history
+HISTSIZE=100000
+SAVEHIST=100000
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_REDUCE_BLANKS
+setopt EXTENDED_HISTORY
+
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey '^[[A' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search
+bindkey '^P' up-line-or-beginning-search
+bindkey '^N' down-line-or-beginning-search
+
+# zsh-autosuggestions
+for _zsh_autosuggest in \
+  /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
+  /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+do
+  if [ -f "$_zsh_autosuggest" ]; then
+    source "$_zsh_autosuggest"
+    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
+    ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+    bindkey '^ ' autosuggest-accept
+    break
+  fi
+done
+unset _zsh_autosuggest
+
