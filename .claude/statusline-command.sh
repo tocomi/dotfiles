@@ -8,6 +8,7 @@ used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 total_input=$(echo "$input" | jq -r '.context_window.total_input_tokens // empty')
 total_output=$(echo "$input" | jq -r '.context_window.total_output_tokens // empty')
 transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
+effort=$(echo "$input" | jq -r '.effort.level // empty')
 
 # ANSI color codes (ANSI-C quoting so escapes are interpreted in all contexts)
 BLUE=$'\033[34m'
@@ -42,9 +43,23 @@ else
   branch_str=""
 fi
 
+# Reasoning effort level (absent when the model has no effort parameter)
+if [ -n "$effort" ] && [ "$effort" != "null" ]; then
+  case "$effort" in
+    low)          effort_color="$DIM" ;;
+    medium)       effort_color="$GREEN" ;;
+    high)         effort_color="$YELLOW" ;;
+    xhigh|max)    effort_color="$RED" ;;
+    *)            effort_color="$DIM" ;;
+  esac
+  effort_str=" ${effort_color}(${effort})${RESET}"
+else
+  effort_str=""
+fi
+
 # Model info
 if [ -n "$model" ]; then
-  model_str="${CYAN}🤖 ${model}${RESET}"
+  model_str="${CYAN}🤖 ${model}${RESET}${effort_str}"
 else
   model_str=""
 fi
