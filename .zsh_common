@@ -25,6 +25,38 @@ alias gmd='gf && gc develop && gm && gc - && gm develop'
 alias gp='git push origin HEAD'
 alias gs='git status'
 
+# ghq + peco
+# リポジトリを peco で選んで移動 (Ctrl+] でも起動)
+alias gq='ghq list'
+function ghq-cd() {
+  local dir
+  dir=$(ghq list --full-path | peco --query "$LBUFFER")
+  if [ -n "$dir" ]; then
+    cd "$dir"
+  fi
+}
+alias gcd='ghq-cd'
+
+function ghq-cd-widget() {
+  ghq-cd
+  zle reset-prompt
+}
+zle -N ghq-cd-widget
+bindkey '^]' ghq-cd-widget
+
+# リポジトリを peco で選んでブラウザで開く
+function ghq-open() {
+  local repo
+  repo=$(ghq list | peco --query "$LBUFFER")
+  if [ -n "$repo" ]; then
+    open "https://$repo"
+  fi
+}
+alias gop='ghq-open'
+
+# リポジトリを clone (例: gget github.com/user/repo)
+alias gget='ghq get -p'
+
 # docker
 alias dcud='docker compose up -d'
 

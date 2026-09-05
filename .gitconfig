@@ -15,3 +15,5 @@
 	lo = log --oneline
 [core]
 	editor = vim
+[ghq]
+	root = ~/develop
