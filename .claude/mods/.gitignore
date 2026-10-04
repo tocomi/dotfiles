@@ -1,0 +1,3 @@
+# Claude Code がロード時に書き出す型定義
+*/.claude-plugin/types/
+*/tsconfig.json

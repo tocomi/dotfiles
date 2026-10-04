@@ -1,0 +1,9 @@
+{
+  "name": "status-band",
+  "version": "0.1.0",
+  "description": "statusline の内容をプロンプト上のバンドにゲージ付きで表示する",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "tocomi"
+  }
+}

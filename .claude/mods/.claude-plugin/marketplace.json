@@ -1,0 +1,14 @@
+{
+  "name": "tocomi-mods",
+  "owner": {
+    "name": "tocomi"
+  },
+  "plugins": [
+    {
+      "name": "status-band",
+      "source": "./status-band",
+      "description": "statusline の内容をプロンプト上のバンドにゲージ付きで表示する"
+    }
+  ],
+  "description": "tocomi の Claude Code mods"
+}
