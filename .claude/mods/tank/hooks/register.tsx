@@ -8,6 +8,9 @@ const tankAtom = atom({ plugin: 'tank', key: 'tank' } as const, EMPTY)
 
 const JST_OFFSET = 9 * 3_600_000
 const TICK_MS = 250
+// 魚が泳ぐ幅とゲージの幅(1行に収める)
+const TANK_WIDTH = 14
+const BAR_WIDTH = 6
 const HISTORY_MAX = 14
 // Lv.1 に必要な餌(出力トークン)。以降はレベルごとに倍
 const BASE_FOOD = 500
@@ -125,20 +128,19 @@ export const register: Register = on => {
     return { text: lines.join('\n') }
   })
 
-  // スピナーの下に水槽を描く
+  // スピナーの下にレベルと水槽を1行で描く。動く水槽は右端に置いて、文字がずれないようにする
   on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
     const spinner = await next(e)
     const t = await read($, tankAtom)
     const now = await $.clock.now()
     const { Box, Text } = $.ui.resolve(e)
 
-    const width = Math.min(48, Math.max(20, (e.viewport?.columns ?? 80) - 40))
     const tick = Math.floor(now / TICK_MS)
     // 魚は水槽の端から端へ往復する(絵文字は2マス)
-    const span = width - 2
+    const span = TANK_WIDTH - 2
     const pos = tick % (span * 2)
     const x = pos < span ? pos : span * 2 - pos
-    const lane = Array.from({ length: width }, (_, i) => {
+    const lane = Array.from({ length: TANK_WIDTH }, (_, i) => {
       const phase = (tick + i * 7) % 23
       return i % 5 === 2 && phase < 3 ? ['·', '°', 'o'][phase]! : ' '
     })
@@ -148,30 +150,28 @@ export const register: Register = on => {
     const s = stage(t.level)
     const from = foodFor(t.level)
     const to = foodFor(t.level + 1)
-    const progress = Math.min(10, Math.round(((t.food - from) / Math.max(1, to - from)) * 10))
+    const progress = Math.min(BAR_WIDTH, Math.round(((t.food - from) / Math.max(1, to - from)) * BAR_WIDTH))
 
     return (
       <Box flexDirection="column">
         {spinner}
-        <Text>
-          <Text color={C.water}>🌊</Text>
-          <Text color={C.bubble}>{left}</Text>
-          <Text>{s.icon}</Text>
-          {isEating && <Text color={C.food}>·∴</Text>}
-          <Text color={C.bubble}>{isEating ? right.slice(2) : right}</Text>
-        </Text>
-        <Text>
+        <Text wrap="truncate-end">
           <Text color={C.level} bold>
-            {'   '}Lv.{t.level}
+            Lv.{t.level}
           </Text>
           <Text color={C.label}> {s.name} </Text>
           <Text backgroundColor={C.bar}>{' '.repeat(progress)}</Text>
-          <Text backgroundColor={C.track}>{' '.repeat(10 - progress)}</Text>
+          <Text backgroundColor={C.track}>{' '.repeat(BAR_WIDTH - progress)}</Text>
           <Text color={C.label}>
             {' '}
             {compact(t.food)}/{compact(to)}
           </Text>
           {t.best !== null && <Text color={C.label}> · 最高 Lv.{t.best.level}</Text>}
+          <Text color={C.water}> 🌊</Text>
+          <Text color={C.bubble}>{left}</Text>
+          <Text>{s.icon}</Text>
+          {isEating && <Text color={C.food}>·∴</Text>}
+          <Text color={C.bubble}>{isEating ? right.slice(2) : right}</Text>
         </Text>
       </Box>
     )

@@ -4,7 +4,6 @@ import type { Engine } from 'claude-code/testing'
 
 const PANE = { plugin: 'insight', component: 'Pane', requestId: 'insight-learn' } as const
 const PANE_PROPS = { title: '学びノート', isFocused: true, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } as const
-const SPINNER = { plugin: 'insight', component: 'Spinner', props: { word: 'Thinking', message: null, suffix: '', mode: 'tool-use' } } as const
 
 // エンジン側の応答: ツールは成功、Haiku は決まった JSON を返す
 function engine(on: On) {
@@ -27,22 +26,11 @@ async function twoReads($: Engine) {
   await $.tool.call({ tool: 'Bash', tool_use_id: 'toolu_2', command: 'git status' })
 }
 
-test('作業中はスピナーの下にツールの流れを出す', async ($, on) => {
-  engine(on)
-  await twoReads($)
-  const ui = await $.ui.mount({ ...SPINNER, surface: 'terminal' })
-  const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text).join('')
-  expect(texts).toContain('spinner')
-  expect(texts).toContain('Read a.ts')
-  expect(texts).toContain('Bash git status')
-  await ui.unmount()
-})
-
 test('ターンの終わりに学びを付けて保存し、ペインに並べる', async ($, on) => {
   engine(on)
   await twoReads($)
   const r = await $.turn.complete({ answer: '直しました', durationMs: 75_000, isAborted: false, turnId: 't1', reason: 'answer' })
-  expect(r.text).toContain('🔧 Read×1 Bash×1 · 1m15s')
+  expect(r.text).not.toContain('🔧')
   expect(r.text).toContain('📝 設定を直した')
   expect(r.text).toContain('💡 mod の $ はトップレベル関数にだけ渡せる')
 
@@ -97,6 +85,45 @@ test('依頼のたびに裏でクイズを作り、作業中だけ出題して�
   const idle = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, isWorking: false } })
   expect((await idle.findAll({ type: 'Text' })).map(t => t.text).join('')).not.toContain('❓')
   await idle.unmount()
+})
+
+test('出題中も回答後も閉じるボタンで隠し、次の依頼でまた出す', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  mock.store(on)
+  let made = 0
+  on('prompt.submit', (_$, e) => ({ text: e.text }))
+  on('model.complete', () => {
+    made += 1
+    return {
+      value: { isAnswered: true, text: `{"q": "問題${made}", "choices": ["a", "b", "c", "d"], "answer": 0, "explain": "x"}`, usage: {} },
+    } as never
+  })
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+  const texts = async (ui: { findAll: (q: { type: 'Text' }) => Promise<{ text: string }[]> }) =>
+    (await ui.findAll({ type: 'Text' })).map(t => t.text).join('')
+
+  // 回答せずに閉じる
+  await $.prompt.submit({ text: '直して', wait: false } as never)
+  await clock.advance(10)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await texts(ui)).toContain('❓ 問題1')
+  await ui.press({ key: 'close' })
+  expect(await texts(ui)).not.toContain('❓')
+  await ui.unmount()
+
+  // 次の依頼で新しい問題が出て、回答後にも閉じられる
+  await $.prompt.submit({ text: 'もう一つ', wait: false } as never)
+  await clock.advance(10)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await texts(band)).toContain('❓ 問題2')
+  await band.press({ key: 'c0' })
+  expect(await texts(band)).toContain('正解！')
+  await band.press({ key: 'close' })
+  expect(await texts(band)).not.toContain('❓')
+  await band.unmount()
 })
 
 test('/quiz でペインを開いて出題し、回答後は n で次へ進む', async ($, on) => {

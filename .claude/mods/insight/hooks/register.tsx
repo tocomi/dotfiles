@@ -1,19 +1,18 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Live, Note, Question, ToolRun } from '../types'
+import type { Note, Question, ToolRun } from '../types'
 
-const liveAtom = atom({ plugin: 'insight', key: 'live' } as const, { thinking: '', tools: [] })
 const notesAtom = atom({ plugin: 'insight', key: 'notes' } as const, [])
 const quizAtom = atom({ plugin: 'insight', key: 'quiz' } as const, null)
 const makingAtom = atom({ plugin: 'insight', key: 'making' } as const, false)
+// プロンプト上のクイズを閉じたか。次の依頼でまた出す
+const closedAtom = atom({ plugin: 'insight', key: 'closed' } as const, false)
 
 const PANE = 'insight-learn'
 const QUIZ_PANE = 'insight-quiz'
 const NOTES_MAX = 300
 const THINKING_MAX = 6000
-const LIVE_TOOLS = 6
-const THROTTLE_MS = 250
 const JST_OFFSET = 9 * 3_600_000
 
 // 学びノートが少ないうちに出題する分野
@@ -22,28 +21,12 @@ const TOPICS = ['TypeScript', 'Git', 'シェルと Unix コマンド', 'Claude C
 const C = {
   ok2: '#22c55e',
   question: '#e5e7eb',
-  thinking: '#c4b5fd',
   label: '#9ca3af',
   muted: '#6b7280',
-  ok: '#4ade80',
   err: '#f87171',
   learn: '#facc15',
   did: '#60a5fa',
   date: '#22d3ee',
-}
-
-const ICON: Record<string, string> = {
-  Read: '📖',
-  Edit: '✏️',
-  Write: '📝',
-  NotebookEdit: '📓',
-  Bash: '💻',
-  Grep: '🔍',
-  Glob: '🗂️',
-  WebFetch: '🌐',
-  WebSearch: '🌐',
-  Agent: '🤖',
-  Task: '🤖',
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -64,22 +47,10 @@ function describe(name: string, args: Record<string, unknown>): string {
 
 const shortName = (name: string) => (name.startsWith('mcp__') ? (name.split('__').pop() ?? name) : name)
 
-function seconds(ms: number): string {
-  const s = Math.round(ms / 1000)
-  return s >= 60 ? `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s` : `${s}s`
-}
-
 function jstStamp(now: number): string {
   const d = new Date(now + JST_OFFSET)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`
-}
-
-// ツールの流れを「Read×5 Grep×3」の形に数える
-function tally(tools: ToolRun[]): string {
-  const counts = new Map<string, number>()
-  for (const t of tools) counts.set(t.name, (counts.get(t.name) ?? 0) + 1)
-  return [...counts].map(([name, n]) => `${name}×${n}`).join(' ')
 }
 
 // ターンの材料から「やったこと」と「学び」を Haiku に書いてもらう
@@ -208,11 +179,10 @@ async function answerQuiz($: EngineInterface, picked: number) {
 }
 
 export const register: Register = on => {
-  // このターンの材料。描画に使う分は liveAtom にも写す
+  // このターンの材料。ターンの終わりに学びを書いてもらうのに使う
   let prompt = ''
   let thinking = ''
   let tools: ToolRun[] = []
-  let lastPush = 0
 
   on('session.start', async ($, e, next) => {
     const result = await next(e)
@@ -228,10 +198,11 @@ export const register: Register = on => {
     prompt = e.text
     thinking = ''
     tools = []
-    await update($, liveAtom, () => ({ thinking: '', tools: [] }))
-    // 回答済み(か未作成)なら、次の問題を裏で作り始める
+    // 回答済み(か未作成、閉じた)なら、次の問題を裏で作り始める
     const quiz = await read($, quizAtom)
-    if (quiz === null || quiz.picked !== null) {
+    const isClosed = await read($, closedAtom)
+    await update($, closedAtom, () => false)
+    if (quiz === null || quiz.picked !== null || isClosed) {
       $.clock.after(0, () => {
         void nextQuiz($)
       })
@@ -239,19 +210,11 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // 思考のストリームを横から読み、そのまま流す。描き直しは間引く
+  // 思考のストリームを横から読み、そのまま流す
   on('turn.step', async function* ($, e, next) {
     const stream = next(e)
     for await (const chunk of stream) {
-      if (e.agentId === undefined && chunk.kind === 'thinking') {
-        thinking = (thinking + chunk.text).slice(-THINKING_MAX)
-        const now = await $.clock.now()
-        if (now - lastPush >= THROTTLE_MS) {
-          lastPush = now
-          const latest = thinking
-          await update($, liveAtom, l => ({ ...(l ?? { tools: [] }), thinking: latest }))
-        }
-      }
+      if (e.agentId === undefined && chunk.kind === 'thinking') thinking = (thinking + chunk.text).slice(-THINKING_MAX)
       yield chunk
     }
     return stream.result
@@ -259,30 +222,22 @@ export const register: Register = on => {
 
   on('tool.call', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
-    const run: ToolRun = { name: shortName(e.tool), detail: describe(e.tool, e as unknown as Record<string, unknown>) }
-    const index = tools.length
-    tools = [...tools, run]
-    await update($, liveAtom, l => ({ thinking: l?.thinking ?? thinking, tools }))
-    const startedAt = await $.clock.now()
     const result = await next(e)
-    // state に渡した値は書き換えず、終わった呼び出しを新しい値で差し替える
-    const done: ToolRun = {
-      ...run,
-      ms: (await $.clock.now()) - startedAt,
+    const run: ToolRun = {
+      name: shortName(e.tool),
+      detail: describe(e.tool, e as unknown as Record<string, unknown>),
       ok: result.deny === undefined && result.isError !== true,
     }
-    tools = tools.map((t, i) => (i === index ? done : t))
-    await update($, liveAtom, l => ({ thinking: l?.thinking ?? thinking, tools }))
+    tools = [...tools, run]
     return result
   })
 
-  // ターンの終わりに、回答の下へツールのまとめと学びを付ける
+  // ターンの終わりに、回答の下へやったことと学びを付ける
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     if (e.agentId !== undefined || e.reason !== 'answer') return result
 
     const lines: string[] = []
-    if (tools.length > 0) lines.push(`🔧 ${tally(tools)} · ${seconds(e.durationMs)}`)
 
     const worthIt = tools.length >= 2 || thinking.length > 500
     const summary = worthIt ? await summarize($, { prompt, thinking, tools, answer: e.answer }) : null
@@ -301,7 +256,6 @@ export const register: Register = on => {
       await $.store.set('notes', notes)
     }
 
-    await update($, liveAtom, () => ({ thinking: '', tools: [] }))
     return lines.length === 0 ? result : { ...result, text: lines.join('\n') }
   })
 
@@ -318,48 +272,6 @@ export const register: Register = on => {
     await $.ui.open({ id: PANE, title: '学びノート', focus: true, closeOnEscape: true })
     const notes = await read($, notesAtom)
     return { text: `学びノート: ${notes.length} 件` }
-  })
-
-  // 作業中はスピナーの下に、最新の思考とツールの流れを出す
-  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
-    const spinner = await next(e)
-    const live = await read($, liveAtom)
-    if (live.thinking === '' && live.tools.length === 0) return spinner
-
-    const { Box, Text } = $.ui.resolve(e)
-    const thought = oneLine(live.thinking).slice(-300)
-    const recent = live.tools.slice(-LIVE_TOOLS)
-    const hidden = live.tools.length - recent.length
-    return (
-      <Box flexDirection="column">
-        {spinner}
-        {thought !== '' && (
-          <Text color={C.thinking} wrap="truncate-start">
-            💭 {thought}
-          </Text>
-        )}
-        {recent.length > 0 && (
-          <Text wrap="truncate-end">
-            {hidden > 0 && <Text color={C.muted}>+{hidden} → </Text>}
-            {recent.map((t, i) => (
-              <Text>
-                {i > 0 && <Text color={C.muted}> → </Text>}
-                <Text>{ICON[t.name] ?? '🔧'} </Text>
-                <Text color={t.ok === false ? C.err : C.label}>
-                  {t.name}
-                  {t.detail !== '' && ` ${t.detail}`}
-                </Text>
-                {t.ms === undefined ? (
-                  <Text color={C.muted}> …</Text>
-                ) : (
-                  <Text color={C.muted}> {seconds(t.ms)}</Text>
-                )}
-              </Text>
-            ))}
-          </Text>
-        )}
-      </Box>
-    )
   })
 
   // 学びノートのペイン: 新しい順に日付ごとに並べる
@@ -394,18 +306,23 @@ export const register: Register = on => {
       </Box>
     )
   })
-  // 作業中だけ、プロンプトの上に復習クイズを出す。回答したら n で次の問題へ
+  // 作業中だけ、プロンプトの上に復習クイズを出す。回答したら n で次の問題へ、x で閉じる
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const quiz = await read($, quizAtom)
     const isMakingQuiz = await read($, makingAtom)
+    const isClosed = await read($, closedAtom)
     const theirs = await next(e)
-    if (e.props.hasSurvey || !e.props.isWorking || (quiz === null && !isMakingQuiz)) return theirs
+    if (e.props.hasSurvey || !e.props.isWorking || isClosed || (quiz === null && !isMakingQuiz)) return theirs
 
     const { Box, Button, Text } = $.ui.resolve(e)
+    const close = <Button key="close" label="閉じる" hotkey="x" plain onPress={() => update($, closedAtom, () => true)} />
     if (quiz === null) {
       return (
         <Box flexDirection="column">
-          <Text color={C.muted}>❓ 次の問題を作っています…</Text>
+          <Box flexDirection="row" gap={2}>
+            <Text color={C.muted}>❓ 次の問題を作っています…</Text>
+            {close}
+          </Box>
           {theirs}
         </Box>
       )
@@ -422,7 +339,10 @@ export const register: Register = on => {
             {question.choices.map((choice, i) => (
               <Button key={`c${i}`} label={choice} hotkey={String(i + 1)} plain onPress={() => answerQuiz($, i)} />
             ))}
-            <Text color={C.muted}>クリックか ctrl+x → Tab で選んで数字キー</Text>
+            <Box flexDirection="row" gap={2}>
+              {close}
+              <Text color={C.muted}>クリックか ctrl+x → Tab で選んで数字キー</Text>
+            </Box>
           </Box>
         ) : (
           <Box flexDirection="column">
@@ -435,7 +355,10 @@ export const register: Register = on => {
               {isCorrect ? '正解！' : '残念…'}
               <Text color={C.label}> {question.explain}</Text>
             </Text>
-            <Button key="next" label="次の問題" hotkey="n" plain onPress={() => nextQuiz($)} />
+            <Box flexDirection="row" gap={2}>
+              <Button key="next" label="次の問題" hotkey="n" plain onPress={() => nextQuiz($)} />
+              {close}
+            </Box>
           </Box>
         )}
         {theirs}

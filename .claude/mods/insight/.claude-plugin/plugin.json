@@ -1,7 +1,7 @@
 {
   "name": "insight",
   "version": "0.1.0",
-  "description": "作業中の思考とツールの流れを見せ、ターンごとに「やったこと／学び」を残す",
+  "description": "ターンごとに「やったこと／学び」を残し、作業中に復習クイズを出す",
   "types": "./types/index.d.ts",
   "author": { "name": "tocomi" }
 }
