@@ -132,14 +132,15 @@ export const register: Register = on => {
 
     const { Box, Text } = $.ui.resolve(e)
 
-    // 指標をまとめる。レート制限は残量で塗る
+    // 指標をまとめる。どれも残量で塗り、色は使用量で決める
     const ctx = usage?.ctxPercent
+    const ctxLeft = ctx === undefined ? undefined : clamp(100 - ctx, 0, 100)
     const metrics: Metric[] = [
       {
         icon: '🪣',
         label: 'ctx',
-        value: ctx === undefined ? '--' : `${ctx}%`,
-        fill: ctx ?? 0,
+        value: ctxLeft === undefined ? '--' : `${ctxLeft}%`,
+        fill: ctxLeft ?? 0,
         color: levelColor(ctx ?? 0),
       },
       ...(usage?.limits ?? [])
