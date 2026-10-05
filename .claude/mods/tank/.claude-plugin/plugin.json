@@ -1,0 +1,7 @@
+{
+  "name": "tank",
+  "version": "0.1.0",
+  "description": "Claude の出力トークンを餌に育つ魚。1日でどこまで育てられるか",
+  "types": "./types/index.d.ts",
+  "author": { "name": "tocomi" }
+}

@@ -24,5 +24,7 @@ brew install zsh-autosuggestions ghq peco
 # Claude Code の mod（dotfiles/.claude/mods をマーケットプレイスとして登録）
 if command -v claude >/dev/null 2>&1; then
   claude plugin marketplace add "$HOME/dotfiles/.claude/mods"
-  claude plugin install status-band@tocomi-mods
+  for dir in "$HOME/dotfiles/.claude/mods"/*/; do
+    claude plugin install "$(basename "$dir")@tocomi-mods"
+  done
 fi

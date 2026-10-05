@@ -1,0 +1,7 @@
+{
+  "name": "tool-stats",
+  "version": "0.1.0",
+  "description": "ツールの使い方を集計して /tools のペインに表示する",
+  "types": "./types/index.d.ts",
+  "author": { "name": "tocomi" }
+}

@@ -220,11 +220,15 @@ export const register: Register = on => {
         </Box>
       )
 
+    // 同じ場所に描く他の mod(insight のクイズなど)の分も残す
+    const theirs = await next(e)
+
     return (
       <Box flexDirection="column">
         {row1}
         {row2}
         {row3}
+        {theirs}
       </Box>
     )
   })
