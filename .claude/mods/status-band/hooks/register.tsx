@@ -221,7 +221,7 @@ export const register: Register = on => {
         </Box>
       )
 
-    // 同じ場所に描く他の mod(insight のクイズなど)の分も残す
+    // 同じ場所に描く他の mod の分も残す
     const theirs = await next(e)
 
     return (

@@ -1,7 +1,0 @@
-{
-  "name": "insight",
-  "version": "0.1.0",
-  "description": "ターンごとに「やったこと／学び」を残す",
-  "types": "./types/index.d.ts",
-  "author": { "name": "tocomi" }
-}

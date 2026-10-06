@@ -10,11 +10,6 @@
       "description": "statusline の内容をプロンプト上のバンドにゲージ付きで表示する"
     },
     {
-      "name": "insight",
-      "source": "./insight",
-      "description": "作業中の思考とツールの流れを見せ、ターンごとに「やったこと／学び」を残す"
-    },
-    {
       "name": "tool-stats",
       "source": "./tool-stats",
       "description": "ツールの使い方を集計して /tools のペインに表示する"
