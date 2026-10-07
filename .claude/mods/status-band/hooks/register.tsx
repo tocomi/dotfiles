@@ -7,7 +7,7 @@ const branchAtom = atom({ plugin: 'status-band', key: 'branch' } as const, null)
 const modelAtom = atom({ plugin: 'status-band', key: 'model' } as const, null)
 const usageAtom = atom({ plugin: 'status-band', key: 'usage' } as const, null)
 
-const BAR_WIDTH = 12
+const BAR_WIDTH = 10
 const HOUR = 3_600_000
 const JST_OFFSET = 9 * HOUR
 const LIMIT_LABEL: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
@@ -67,6 +67,11 @@ function resetLabel(resetsAt: number, now: number): string {
 
 // 表示する指標ひとつ分: 絵文字、ラベル、値の文字列、ゲージの塗り(%)、色、補足
 type Metric = { icon: string; label: string; value: string; fill: number; color: string; note?: string }
+
+// 横並びに要る桁数。絵文字は2マスで数え、端末によって幅がぶれる分を ROW_SLACK で吸収する
+const SEP_WIDTH = 3
+const ROW_SLACK = 2
+const metricWidth = (m: Metric) => 2 + 1 + m.label.length + 1 + BAR_WIDTH + (m.note === undefined ? 0 : 1 + m.note.length)
 
 async function refreshBranch($: EngineInterface) {
   const cwd = await $.session.cwd()
@@ -207,8 +212,9 @@ export const register: Register = on => {
     )
 
     // 3行目: レート制限。1行に収まらない幅では縦に並べる
+    const row3Width = limitMetrics.reduce((sum, m, i) => sum + (i > 0 ? SEP_WIDTH : 0) + metricWidth(m), 0)
     const row3 =
-      limitMetrics.length === 0 ? null : e.props.bodyColumns < 72 ? (
+      limitMetrics.length === 0 ? null : e.props.bodyColumns < row3Width + ROW_SLACK ? (
         limitMetrics.map(bar)
       ) : (
         <Box>

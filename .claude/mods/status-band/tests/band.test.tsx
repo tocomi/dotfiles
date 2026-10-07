@@ -70,3 +70,27 @@ test('使用量がまだ届いていなくても描く', async ($, on) => {
   expect(texts).toContain('ctx  --')
   await ui.unmount()
 })
+
+test('レート制限は収まる幅なら1行、収まらなければ縦に並べる', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  engine(on)
+  await $.session.measure({
+    context: { tokens: 0, window: 200_000, percent: 0 },
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 0, resetsAt: new Date(NOW + 3 * HOUR).toISOString() },
+      { kind: 'seven_day', percentUsed: 0, resetsAt: new Date(NOW + 6 * 24 * HOUR).toISOString() },
+    ],
+    changed: ['context', 'rateLimits'],
+  })
+
+  // 5h(23桁) + 区切り(3) + 7d(29桁) = 55桁、余裕 2 を足して 57 桁から1行
+  const separators = async (bodyColumns: number) => {
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns } })
+    const n = (await ui.findAll({ type: 'Text', text: '│' })).length
+    await ui.unmount()
+    return n
+  }
+  // 区切りは2行目(モデル│ctx)に1つ、3行目が横並びならもう1つ
+  expect(await separators(57)).toBe(2)
+  expect(await separators(56)).toBe(1)
+})

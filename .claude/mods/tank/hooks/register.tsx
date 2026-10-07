@@ -10,7 +10,7 @@ const JST_OFFSET = 9 * 3_600_000
 const TICK_MS = 250
 // 魚が泳ぐ幅とゲージの幅(1行に収める)
 const TANK_WIDTH = 14
-const BAR_WIDTH = 6
+const BAR_WIDTH = 10
 const HISTORY_MAX = 14
 // Lv.1 に必要な餌(出力トークン)。以降はレベルごとに倍
 const BASE_FOOD = 500
@@ -155,24 +155,31 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {spinner}
-        <Text wrap="truncate-end">
-          <Text color={C.level} bold>
-            Lv.{t.level}
+        {/* レベルとゲージは縮めず、幅が足りないときは右側の情報と水槽から切り詰める */}
+        <Box>
+          <Box flexShrink={0}>
+            <Text>
+              <Text color={C.level} bold>
+                Lv.{t.level}
+              </Text>
+              <Text color={C.label}> {s.name} </Text>
+              <Text backgroundColor={C.bar}>{' '.repeat(progress)}</Text>
+              <Text backgroundColor={C.track}>{' '.repeat(BAR_WIDTH - progress)}</Text>
+            </Text>
+          </Box>
+          <Text wrap="truncate-end">
+            <Text color={C.label}>
+              {' '}
+              {compact(t.food)}/{compact(to)}
+            </Text>
+            {t.best !== null && <Text color={C.label}> · 最高 Lv.{t.best.level}</Text>}
+            <Text color={C.water}> 🌊</Text>
+            <Text color={C.bubble}>{left}</Text>
+            <Text>{s.icon}</Text>
+            {isEating && <Text color={C.food}>·∴</Text>}
+            <Text color={C.bubble}>{isEating ? right.slice(2) : right}</Text>
           </Text>
-          <Text color={C.label}> {s.name} </Text>
-          <Text backgroundColor={C.bar}>{' '.repeat(progress)}</Text>
-          <Text backgroundColor={C.track}>{' '.repeat(BAR_WIDTH - progress)}</Text>
-          <Text color={C.label}>
-            {' '}
-            {compact(t.food)}/{compact(to)}
-          </Text>
-          {t.best !== null && <Text color={C.label}> · 最高 Lv.{t.best.level}</Text>}
-          <Text color={C.water}> 🌊</Text>
-          <Text color={C.bubble}>{left}</Text>
-          <Text>{s.icon}</Text>
-          {isEating && <Text color={C.food}>·∴</Text>}
-          <Text color={C.bubble}>{isEating ? right.slice(2) : right}</Text>
-        </Text>
+        </Box>
       </Box>
     )
   })

@@ -62,3 +62,16 @@ test('日付が変わるとリセットされ、前日の分が最高記録に�
   expect(texts).toContain('最高 Lv.2')
   await ui.unmount()
 })
+
+test('レベルとゲージは縮まない枠に入り、ゲージは常に10マス', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  engine(on, [600])
+  await step($)
+
+  const ui = await $.ui.mount({ ...SPINNER, surface: 'terminal' })
+  const fixed = (await ui.findAll({ type: 'Box' })).filter(b => b.props.flexShrink === 0)
+  expect(fixed).toHaveLength(1)
+  // 名前の後ろの区切り1マス + ゲージ10マス
+  expect(fixed[0]!.text).toMatch(/^Lv\.1 さかな {11}$/)
+  await ui.unmount()
+})
