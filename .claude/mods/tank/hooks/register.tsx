@@ -67,12 +67,14 @@ function rollover(t: Tank, day: string): Tank {
 async function feed($: EngineInterface, amount: number) {
   const now = await $.clock.now()
   const before = await read($, tankAtom)
-  const next = await update($, tankAtom, t => {
-    const base = rollover(t ?? EMPTY, today(now))
-    const food = base.food + amount
-    return { ...base, food, level: levelOf(food), fedAt: now }
-  })
+  // 同時に開いている他のセッションも餌をやっているので、手元の値ではなく保存された最新の値に足す
+  const saved = await $.store.get('tank')
+  const latest = saved !== undefined && typeof saved === 'object' ? (saved as Tank) : before
+  const base = rollover(latest, today(now))
+  const food = base.food + amount
+  const next: Tank = { ...base, food, level: levelOf(food), fedAt: now }
   await $.store.set('tank', next)
+  await update($, tankAtom, () => next)
   if (next.level > before.level && next.day === before.day) {
     const s = stage(next.level)
     $.ui.toast(`🎉 Lv.${next.level} ${s.icon} ${s.name}に成長！`)

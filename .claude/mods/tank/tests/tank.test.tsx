@@ -6,8 +6,16 @@ const NOW = Date.parse('2026-10-04T03:00:00Z')
 const SPINNER = { plugin: 'tank', component: 'Spinner', props: { word: 'Thinking', message: null, suffix: '', mode: 'responding' } } as const
 
 // エンジン側の応答: モデルの1ステップが output_tokens だけ出力する
-function engine(on: On, outputs: number[]) {
-  mock.store(on)
+// store を渡すと、テストから書き換えられる共有の保存先になる(他のセッションの書き込みを再現する)
+function engine(on: On, outputs: number[], store?: Map<string, unknown>) {
+  if (store === undefined) mock.store(on)
+  else {
+    on('store.get', async ($, e) => ({ value: store.get(e.key) }))
+    on('store.set', async ($, e) => {
+      store.set(e.key, e.value)
+      return { value: undefined }
+    })
+  }
   let i = 0
   on('turn.step', async function* () {
     const output_tokens = outputs[i++] ?? 0
@@ -73,5 +81,22 @@ test('レベルとゲージは縮まない枠に入り、ゲージは常に10マ
   expect(fixed).toHaveLength(1)
   // 名前の後ろの区切り1マス + ゲージ10マス
   expect(fixed[0]!.text).toMatch(/^Lv\.1 さかな {11}$/)
+  await ui.unmount()
+})
+
+test('他のセッションが保存した餌を上書きせず、そこに足す', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const store = new Map<string, unknown>()
+  engine(on, [600, 1500], store)
+  await step($)
+  // 別のセッションが餌をやって保存した
+  const saved = store.get('tank') as { food: number }
+  store.set('tank', { ...saved, food: saved.food + 3000 })
+  await step($)
+
+  expect((store.get('tank') as { food: number }).food).toBe(600 + 3000 + 1500)
+  const ui = await $.ui.mount({ ...SPINNER, surface: 'terminal' })
+  const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text).join('')
+  expect(texts).toContain('5.1k/8.0k')
   await ui.unmount()
 })
